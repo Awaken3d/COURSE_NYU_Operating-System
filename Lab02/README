@@ -14,5 +14,5 @@ Put ‘sched.out’ into BatchTest directory (For easy use, I have already put i
 	sh ./runit.sh
         sh ./diffit.sh . ../ValidationData
 
-This will take input files in BatchTest directory, generate results and compare with
+This will take input files in BatchTest directory, generate results,  and compare them with
 expected results in ValidationData directory.
