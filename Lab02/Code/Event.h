@@ -46,14 +46,14 @@ class Event{
         void setRemain(int type, int burst);
         void defineMode(int type);
         void recordTime();
-        int getTS();
+        int getTS() const;
 
-        int getType();
+        int getType() const;
         int getDuration();
-        int getRemain();
-        int getCPUburst();
-        int getIOburst();
-        string getMode();
+        int getRemain() const;
+        int getCPUburst() const;
+        int getIOburst() const; 
+        string getMode() const;
 
     private:
 };

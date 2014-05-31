@@ -36,7 +36,7 @@ void Event::recordTime() {
     m_ts = ts;
 }
 
-int Event::getTS() {
+int Event::getTS() const {
     return ts;
 }
 
@@ -111,7 +111,7 @@ void Event::printDone() {
     cout << "==> T(" << pid << "): Done" << endl; 
 }
 
-int Event::getType(){
+int Event::getType() const{
     return m_type;
 }
 
@@ -120,19 +120,19 @@ int Event::getDuration() {
     return m_dur;
 }
 
-int Event::getRemain() {
+int Event::getRemain() const {
     return m_remain;
 }
 
-int Event::getCPUburst() {
+int Event::getCPUburst() const {
     return m_cb;
 }
 
-int Event::getIOburst() {
+int Event::getIOburst() const {
     return m_ib;
 }
 
-string Event::getMode() {
+string Event::getMode() const {
     return m_mode;
 }
 
