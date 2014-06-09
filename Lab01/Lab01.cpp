@@ -1,7 +1,10 @@
 /* File: Lab01.cpp
- * ---------------------------
+ * ---------------------------------
+ * This program implements a linker.
+ * 
  * By           : Jingxin Zhu
- * Last Modified: 06/07/2014
+ * Last Modified: 06/08/2014
+ * ---------------------------------
  */
 
 #include <iostream>
@@ -11,58 +14,49 @@
 #include <cctype>
 #include <map>
 #include <algorithm>
-//#include <stdlib.h>
 
 using namespace std;
 
 struct DefList{
-    int defcnt;
-    vector<string> defSymList;
-    vector<int> defAddrList;
+    int defcnt; // number of defined symbols
+    vector<string> defSymList; // symbols of the form [a-Z][a-Z0-9]*
+    vector<int> defAddrList;   // address
 };
 
 struct ProgramText{
-    int codecnt;
-    vector<string> typeList;
-    vector<string> instrList;
+    int codecnt; // number of instructions in program text
+    vector<string> typeList;  // I, A, E, R
+    vector<string> instrList; // 4-digit instruction
 };
 
 void readFile(char* argv[]);
 bool isNumber(int tokenIndex);
 bool isSymbol(int tokenIndex);
-bool parseDefList(int module, vector<DefList>& defListVec);
+bool parseDefList(int module, vector<DefList>& defListVec, vector<string>& symbolTable);
 bool parseUseList(vector< vector<string> >& useListVec);
 bool parseProgramText(int moduleCt, int& programSum, vector<ProgramText>& progListVec);
-void printSymbolTable(vector<DefList>& defListVec);
-void E_instruction(int type, vector<string>& useList);
-void R_instruction(int useIndex, int moduleCt);
-void A_instruction(int useIndex); 
-void I_instruction(int useIndex); 
+void printSymbolTable(vector<DefList>& defListVec, vector<int>& baseAddList);
+void E_instruction(string token, int type, vector<string>& useList);
+void R_instruction(string token, int useIndex, int moduleCt, vector<int>& baseAddList);
+void A_instruction(string token, int useIndex); 
+void I_instruction(string token, int useIndex); 
 int parseInstruction(string token);
 string getInstr(int num);
 string getOrder(int index); 
-void printWarning(vector< vector<string> >& useListVec);
+void printWarning(vector< vector<string> >& useListVec, vector<string>& symbolTable);
 void printModuleWarning(vector<string>& useList, int moduleCt);
-void printDefWarning(vector<DefList>& defListVec, vector<ProgramText>& progListVec);
+void printDefWarning(vector<DefList>& defListVec, const vector<ProgramText>& progListVec);
 void printSyntaxErr(int index, int kind);
 
-vector<string> tokenVec;  // all tokens 
-vector<int> rowVec;    // line number of each token
-vector<int> colVec;  // store each cols
-vector<string> symbolTable;  // for print
-
-vector<int> baseAddList;
-vector<string> defShowup;   // store all tokens that have been tested
+vector<string> tokenVec;      // all tokens 
+vector<int> rowVec;           // row number of each token
+vector<int> colVec;           // column number of each token 
     
-vector<string> typeList;   // all IAER
-vector<string> instruList; // all 1000
-
-map<string, int> defMap;  // <defSym, moduleCt>
-map<string, int> defSymMap; // <defSym, OccurCt>
-map<string, int> symValueMap; //<symbol, value>
-map<string, int> useCtMap;   // <useSym, OccurCt>
-map<string, int> symModMap; // <TableSym, ModuleCt>
-map<int,int> ModSizeMap;   // <ModuleCt, ModuleSize>
+map<string, int> defMap;      // <defSym, moduleCt>
+map<string, int> defSymMap;   // <defSym, OccurCt>
+map<string, int> symValueMap; //2 <symbol, value>
+map<string, int> useCtMap;    // <useSym, OccurCt>
+map<int,int> ModSizeMap;      //2 <ModuleCt, ModuleSize>
 
 int tokenIndex = 0;
 int tokenNum;  // The number of total tokens in the file
@@ -75,18 +69,19 @@ int main (int argc, char* argv[]){
     }
     readFile(argv);
 
-    tokenNum = tokenVec.size(); // number of all tokens
-    int moduleCt = 0;   // counter for nudule number
-    int programSum = 0; // sum of programs in all modules
     vector<DefList> defListVec;
     vector< vector<string> > useListVec;
     vector<ProgramText> progListVec;
+    vector<string> symbolTable;
 
     /*       Pass One         */
-    baseAddList.push_back(0);
-
+    int moduleCt = 0;   // counter for nudule number
+    int programSum = 0; // sum of programs in all modules
+    tokenNum = tokenVec.size(); // number of all tokens
+    vector<int> baseAddList;
+    baseAddList.push_back(programSum);
     while( tokenIndex < tokenNum ) {
-        if( !parseDefList(moduleCt, defListVec) ) {
+        if( !parseDefList(moduleCt, defListVec, symbolTable) ) {
             return 1;
         }
         if ( !parseUseList(useListVec) ) {
@@ -96,17 +91,16 @@ int main (int argc, char* argv[]){
             return 1;
         }	
         tokenIndex++;
+        baseAddList.push_back(programSum);
         moduleCt++;
-        baseAddList.push_back(typeList.size());
     }
     printDefWarning(defListVec,progListVec);
-    printSymbolTable(defListVec);
+    printSymbolTable(defListVec, baseAddList);
 
     /*       Pass Two         */
     int moduleNum = defListVec.size();
     moduleCt = 0;
     int useIndex = 0;
-    //Module by module
     cout << "Memory Map" << endl;
     while( moduleCt < moduleNum ) {
         vector<string> useList = useListVec[moduleCt]; 
@@ -119,22 +113,23 @@ int main (int argc, char* argv[]){
         }
 
         for (int i = 0; i < progListVec[moduleCt].codecnt; i++) {
-            string type = typeList[useIndex];
+            string type = progListVec[moduleCt].typeList[i];
+            string instr = progListVec[moduleCt].instrList[i];
             if (type == "A")  	
-                A_instruction(useIndex);
+                A_instruction(instr, useIndex);
             if (type == "I")  	
-                I_instruction(useIndex);
+                I_instruction(instr, useIndex);
             if (type == "E")
-                E_instruction(useIndex, useList);
+                E_instruction(instr, useIndex, useList);
             if (type == "R")
-                R_instruction(useIndex, moduleCt);
+                R_instruction(instr, useIndex, moduleCt, baseAddList);
             useIndex++;
         }
         printModuleWarning(useList, moduleCt);
         moduleCt++;
     }
 
-    printWarning(useListVec);
+    printWarning(useListVec, symbolTable);
 
     return 0;
 }
@@ -191,7 +186,8 @@ bool isType(int tokenIndex) {
     }
 }
 
-void printSymbolTable(vector<DefList>& defListVec) {
+void printSymbolTable(vector<DefList>& defListVec,
+        vector<int>& baseAddList) {
     cout << "Symbol Table" << endl;
     DefList deflist;
     int size = defListVec.size();
@@ -216,25 +212,23 @@ void printSymbolTable(vector<DefList>& defListVec) {
     cout << endl;
 }
 
-void printDefWarning(vector<DefList>& defListVec, vector<ProgramText>& progListVec) { 
+void printDefWarning(vector<DefList>& defListVec,const vector<ProgramText>& progListVec) { 
+    vector<string> defShowup;   // store all tokens that have been tested
     int count = 0;
     int moduleNum= defListVec.size();
-    DefList deflist;
+    DefList* deflist;
     for (int i = 0; i < moduleNum; i++) {
-        deflist = defListVec[i];
-        int num = deflist.defcnt;
+        deflist = &defListVec[i];
+        int num = deflist->defcnt;
         // compare each address in the def list to code count	
         for (int j = 0; j < num; j++) {
-            string token = deflist.defSymList[j];
-            int address = deflist.defAddrList[j];
+            string token = deflist->defSymList[j];
+            int address = deflist->defAddrList[j];
             if (find(defShowup.begin(), defShowup.end(), token)==defShowup.end()) {
-                //if (address >= progCntList[i]) {
                 if (address >= progListVec[i].codecnt) {
-                    cout << "Warning: Module " << i+1 << ": " 
-                        << token << " to big " << address << " (max=" 
-                        << progListVec[i].codecnt - 1
-                        << ") assume zero relative" << endl;
-                    deflist.defAddrList[j] = 0;
+                    printf("Warning: Module %d: %s to big %d (max=%d) assume zero relative\n",
+                            i+1, token.c_str(), address, progListVec[i].codecnt - 1);
+                    deflist->defAddrList[j] = 0;
                 }
                 defShowup.push_back(token);
             }
@@ -289,7 +283,7 @@ string getOrder(int index) {
 /* Print warning if a symbol is defined in definition list,
  * but is not ever used in use list.
  */
-void printWarning(vector< vector<string> >& useListVec) {
+void printWarning(vector< vector<string> >& useListVec, vector<string>& symbolTable) {
     cout << endl;
     int size = symbolTable.size();
     for (int i = 0; i < size; i++ ) {
@@ -305,7 +299,7 @@ void printWarning(vector< vector<string> >& useListVec) {
             }
         }
         if ( found == false ) {
-            printf("Warning: Module %d : %s %s\n",
+            printf("Warning: Module %d: %s %s\n",
                     defMap[symbol] + 1, symbol.c_str(), 
                     "was defined but never used");
         }
@@ -353,8 +347,7 @@ void readFile(char* argv[]) {
     }
 }
 
-void E_instruction(int useIndex, vector<string>& useList) {
-    string token = instruList[useIndex];
+void E_instruction(string token, int useIndex, vector<string>& useList) {
     int length = token.length();
     if (length > 4) {
         cout << getOrder(useIndex) << ": " << 9999 
@@ -375,7 +368,6 @@ void E_instruction(int useIndex, vector<string>& useList) {
             if ( iter == defSymMap.end() ) {
                 cout << getOrder(useIndex) << ": "<< getInstr(opcode * 1000) 
                     << " Error: " << token << " is not defined; zero used" << endl;
-                //symbolTable.push_back(token);
                 useCtMap[token] += 1;
             } else {
                 useCtMap[token] += 1; 
@@ -386,8 +378,7 @@ void E_instruction(int useIndex, vector<string>& useList) {
     }
 }
 
-void A_instruction(int useIndex) {
-    string token = instruList[useIndex];
+void A_instruction(string token, int useIndex) {
     if (token.length() > 4) {
         cout << getOrder(useIndex) << ": " << 9999 
             << " Error: Illegal opcode; treated as 9999" << endl;
@@ -404,8 +395,7 @@ void A_instruction(int useIndex) {
     }
 }
 
-void I_instruction(int useIndex) {
-    string token = instruList[useIndex];
+void I_instruction(string token, int useIndex) {
     if ( token.length() > 4 ) {
         cout << getOrder(useIndex) << ": " << 9999 << 
             " Error: Illegal immediate value; treated as 9999" << endl;	
@@ -415,8 +405,8 @@ void I_instruction(int useIndex) {
     }
 }
 
-void R_instruction(int useIndex, int moduleCt){
-    string token = instruList[useIndex];
+void R_instruction(string token, int useIndex, int moduleCt,
+        vector<int>& baseAddList){
     if (token.length() > 4) {
         cout << getOrder(useIndex) << ": " << 9999 
             << " Error: Illegal opcode; treated as 9999" << endl;
@@ -435,62 +425,55 @@ void R_instruction(int useIndex, int moduleCt){
     }
 }
 
-bool parseDefList(int module, vector<DefList>& defListVec) {
+bool parseDefList(int module, vector<DefList>& defListVec, 
+        vector<string>& symbolTable) {
     // test def counter: is defCnt a number? 
     DefList deflist;
     if (!isNumber(tokenIndex)){
         printSyntaxErr(tokenIndex, 1);
         return false;
-    } else {
+    }
     // test def counter: is defCnt < MAX_DEF_NUM (16)?
-        int defCnt = atoi(tokenVec[tokenIndex].c_str());
-        deflist.defcnt = defCnt;
-        
-        if (defCnt > 16) {
-            // TO_MANY_DEF_IN_MODULE: 
-            printSyntaxErr(tokenIndex, 2);
+    int defCnt = atoi(tokenVec[tokenIndex].c_str());
+    deflist.defcnt = defCnt;
+    if (defCnt > 16) {
+        printSyntaxErr(tokenIndex, 2); // TO_MANY_DEF_IN_MODULE: 
+        return false;
+    } 
+
+    for (int i = 0; i < defCnt; i++) {		
+        tokenIndex++;
+        // test def symbol: is defsym a valid symbol?
+        if( !isSymbol(tokenIndex) ) {
+            printSyntaxErr(tokenIndex, 3);
             return false;
-        } else {
-            // test def symbol: is defsym a valid symbol?
-            for (int i = 0; i < defCnt; i++) {		
-                tokenIndex++;
-                // SYM_EXPECTED: if miss token or unexpected token
-                if( !isSymbol(tokenIndex) ) {
-                    printSyntaxErr(tokenIndex, 3);
-                    return false;
-                } else {
-            // test def symbol: is defsym too long? (> 16)
-                    if (tokenVec[tokenIndex].length() > 16) {
-                        printSyntaxErr(tokenIndex, 5);
-                        return false;
-                    }
-                    string token = tokenVec[tokenIndex];
-                    deflist.defSymList.push_back(token);
-
-                    // store the module number of each def symbol
-                    map<string, int>::const_iterator iter = defMap.find(token);
-                    if ( iter == defMap.end() ) {
-                        defMap.insert(make_pair(token, module));
-                    }
-
-                    // store the times that one symbol occurs 
-                    defSymMap[token] += 1;
-                    if (defSymMap[token] == 1) {
-                        symbolTable.push_back(token);
-                        symModMap.insert(make_pair(token, module));
-                    }
-
-                    tokenIndex++;	
-                    if ( !isNumber(tokenIndex)) {
-                        printSyntaxErr(tokenIndex, 1);
-                        return false;
-                    } else {
-                        deflist.defAddrList.push_back(atoi(tokenVec[tokenIndex].c_str()));
-                    } // "isNumber" if-else ends here
-                } // "isSymbol" if-else ends here
-            } // for-loop ends here
+        } 
+        // test def symbol: is defsym too long? (> 16)
+        if (tokenVec[tokenIndex].length() > 16) {
+            printSyntaxErr(tokenIndex, 5);
+            return false;
         }
-    } // "isNumber" if-else ends here
+
+        string token = tokenVec[tokenIndex];
+        deflist.defSymList.push_back(token);
+        // store the module number of each def symbol
+        map<string, int>::const_iterator iter = defMap.find(token);
+        if ( iter == defMap.end() ) {
+            defMap.insert(make_pair(token, module));
+        }
+        // store the times that one symbol occurs 
+        defSymMap[token] += 1;
+        if (defSymMap[token] == 1) {
+            symbolTable.push_back(token);
+        }
+        tokenIndex++;
+        // test address: is address a valid number? 
+        if ( !isNumber(tokenIndex)) {
+            printSyntaxErr(tokenIndex, 1);
+            return false;
+        } 
+        deflist.defAddrList.push_back(atoi(tokenVec[tokenIndex].c_str()));
+    } // for-loop ends here
     defListVec.push_back(deflist);
     return true;
 }
@@ -502,28 +485,26 @@ bool parseUseList(vector< vector<string> >& useListVec){
         // test uselist number: is useCnt a valid number? 
         printSyntaxErr(tokenIndex, 1);
         return false;
-    } else {
-        int useCnt = atoi(tokenVec[tokenIndex].c_str());
-        if (useCnt > 16) {
-            printSyntaxErr(tokenIndex, 4); // TO_MANY_USE_IN_MODULE
+    }
+    int useCnt = atoi(tokenVec[tokenIndex].c_str());
+    if (useCnt > 16) {
+        printSyntaxErr(tokenIndex, 4); // TO_MANY_USE_IN_MODULE
+        return false;
+    }
+
+    for (int i = 0; i < useCnt; i++) {		
+        tokenIndex++;
+        if( !isSymbol(tokenIndex) ) {
+            // test use symbol: is a valid symbol?
+            printSyntaxErr(tokenIndex, 2); // SYM_EXPECTED
             return false;
-        } else {
-            for (int i = 0; i < useCnt; i++) {		
-                tokenIndex++;
-                if( !isSymbol(tokenIndex) ) {
-                    // test use symbol: is a valid symbol?
-                    printSyntaxErr(tokenIndex, 2); // SYM_EXPECTED
-                    return false;
-                } else {
-                    if ( tokenVec[tokenIndex].length() > 16 ) {
-                        printSyntaxErr(tokenIndex, 5); // SYM_TOLONG
-                        return false;
-                    }
-                    useList.push_back(tokenVec[tokenIndex]);
-                } // "isSymbol" if-else ends here
-            } // for-loop ends here
         }
-    } // "isNumber" if-else ends here
+        if ( tokenVec[tokenIndex].length() > 16 ) {
+            printSyntaxErr(tokenIndex, 5); // SYM_TOLONG
+            return false;
+        }
+        useList.push_back(tokenVec[tokenIndex]);
+    }
     useListVec.push_back( useList );
     return true;
 }
@@ -535,33 +516,29 @@ bool parseProgramText(int moduleCt, int& programSum, vector<ProgramText>& progLi
         // test progCnt: is progCnt is a valid number?
         printSyntaxErr(tokenIndex, 1);
         return false;
-    } else {
-        int progCt= atoi(tokenVec[tokenIndex].c_str());
-        if ( progCt > (512 - programSum)) {
-            printSyntaxErr(tokenIndex, 6);
+    } 
+    int progCt= atoi(tokenVec[tokenIndex].c_str());
+    if ( progCt > (512 - programSum)) {
+        printSyntaxErr(tokenIndex, 6);
+        return false;
+    }
+    programSum += progCt;
+    pt.codecnt = progCt;
+    ModSizeMap.insert(make_pair(moduleCt, progCt)); 
+    for (int i = 0; i < progCt; i++) { 
+        tokenIndex++;
+        // Miss token or Unexpected token
+        if( !isType(tokenIndex) ) {
+            printSyntaxErr(tokenIndex, 7); // ADDR_EXPECTED
             return false;
-        } else {
-            programSum += progCt;
-            pt.codecnt = progCt;
-            ModSizeMap.insert(make_pair(moduleCt, progCt)); 
-            for (int i = 0; i < progCt; i++) { 
-                tokenIndex++;
-                // Miss token or Unexpected token
-                if( !isType(tokenIndex) ) {
-                    printSyntaxErr(tokenIndex, 7); // ADDR_EXPECTED
-                    return false;
-                } else {
-                    typeList.push_back(tokenVec[tokenIndex]);
-                    tokenIndex++;	
-                    if ( !isNumber(tokenIndex)) {
-                        printSyntaxErr(tokenIndex, 1);
-                        return false;
-                    } else {
-                        instruList.push_back( (tokenVec[tokenIndex]) );
-                    }
-                }
-            }	
         }
+        pt.typeList.push_back(tokenVec[tokenIndex]);
+        tokenIndex++;	
+        if ( !isNumber(tokenIndex)) {
+            printSyntaxErr(tokenIndex, 1);
+            return false;
+        }
+        pt.instrList.push_back(tokenVec[tokenIndex]);
     }	
     progListVec.push_back(pt);
     return true;
