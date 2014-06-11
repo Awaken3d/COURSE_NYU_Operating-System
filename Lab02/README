@@ -5,7 +5,7 @@ This lab aims to simulate Discrete Event Simulator (DES), scheduling a batch of 
 
 Compile:
 
-‘Code’ Directory contains all required files for compiling. Makefile is included, thus type ‘make’ in terminal can compile. Executable file ‘sched.out’ should be created after compiling.
+‘Code’ Directory contains all required files for compiling. Makefile is included, thus typing ‘make’ in terminal can compile. Executable file ‘sched.out’ should be created after compiling.
 
 
 Test:
