@@ -1,14 +1,14 @@
 Goal:
     
-    This program implements a linker in Operating System. Detailed requirements please see lab1-linker.pdf.
+This program implements a linker in Operating System. Detailed requirements please see lab1-linker.pdf.
 
 Compile:
 
-    Makefile in included, so typing in terminal 'make' is enough to compile. Then executable file 'Lab01' is created.
+Makefile is in included, so typing in terminal 'make' is enough to compile. Then executable file 'Lab01' is created.
     
 Test: 
 
-    Put 'Lab01' into BatchTest directory (For easy use, I have already done this). In BatchTest directory, type in terminal:
+Put 'Lab01' into BatchTest directory (For easy use, I have already done this). In BatchTest directory, type in terminal:
 
     sh ./runit.sh
     sh ./diffit.sh . .
