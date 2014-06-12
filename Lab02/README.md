@@ -9,6 +9,7 @@ Compile:
 
 
 Test:
+
 Put ‘sched.out’ into BatchTest directory (For easy use, I have already put it there). In BatchTest directory, type in terminal:
 
 	sh ./runit.sh
