@@ -12,7 +12,7 @@ Test:
 Put ‘sched.out’ into BatchTest directory (For easy use, I have already put it there). In BatchTest directory, type in terminal:
 
 	sh ./runit.sh
-        sh ./diffit.sh . ../ValidationData
+	sh ./diffit.sh . ../ValidationData
 
 This will take input files in BatchTest directory, generate results,  and compare them with
 expected results in ValidationData directory.
