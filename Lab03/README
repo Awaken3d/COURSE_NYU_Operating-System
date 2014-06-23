@@ -1,2 +1,10 @@
 Lab03
 This lab assignment is going to implement memory scheduling.
+
+To compile:
+    $ cd code/
+    $ make
+
+To test:
+    $ cd inputs/
+    $ sh ./test2.sh
